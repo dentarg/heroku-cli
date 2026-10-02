@@ -30,6 +30,36 @@ Key features of the CLI include:
 
 For more on developing plugins, read [Developing CLI Plugins](https://devcenter.heroku.com/articles/developing-cli-plugins)
 
+Local builds and installation
+=============================
+
+Use Node.js 20 or newer to build and run this checkout:
+
+```sh
+npm ci
+npm run build
+./bin/run.js --version
+```
+
+To install the checkout globally, run `npm link`. To distribute a built copy,
+run `npm pack`, copy the resulting `.tgz` file to another computer with Node.js,
+and run `npm install -g /path/to/heroku-11.11.0.tgz`. Use `command -v heroku`
+to verify that your npm installation takes precedence over any Homebrew copy.
+
+Git configuration and update notices
+====================================
+
+Set `HEROKU_DISABLE_GIT_CONFIG=1` in your shell environment to prevent the CLI
+from adding or removing its global Git credential helper, including during
+login and logout. Existing Git configuration is left in place; when opted out,
+you are responsible for configuring Git authentication.
+
+The [Homebrew tap](https://github.com/dentarg/homebrew-tap) sets
+`HEROKU_SKIP_NEW_VERSION_CHECK=true` to suppress npm version checks and
+`HEROKU_DISABLE_AUTOUPDATE=true` to disable the separate self-updater. Update
+those installations with `brew upgrade heroku`. For other installations, set
+these variables explicitly to disable the corresponding checks.
+
 Issues
 ======
 
