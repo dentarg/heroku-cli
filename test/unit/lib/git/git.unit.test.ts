@@ -119,6 +119,20 @@ describe('git', function () {
     expect(git.url('foo')).to.equal('https://git.heroku.com/foo.git')
   })
 
+  it('leaves global git config untouched when opted out', async function () {
+    const previous = process.env.HEROKU_DISABLE_GIT_CONFIG
+    process.env.HEROKU_DISABLE_GIT_CONFIG = '1'
+    try {
+      await git.configureCredentialHelper()
+      await git.removeCredentialHelper()
+
+      expect(execFileStub.called).to.be.false
+    } finally {
+      if (previous === undefined) delete process.env.HEROKU_DISABLE_GIT_CONFIG
+      else process.env.HEROKU_DISABLE_GIT_CONFIG = previous
+    }
+  })
+
   it('configures git credential helper globally when the key is absent', async function () {
     // `git config --global --get` exits non-zero when the key is absent, so
     // `exec` throws and the helper treats it as an empty existing value.

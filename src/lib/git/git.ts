@@ -15,6 +15,8 @@ export default class Git {
   * that is URL-scoped to Heroku Git operations only.
   */
   async configureCredentialHelper() {
+    if (process.env.HEROKU_DISABLE_GIT_CONFIG === '1') return
+
     const {httpGitHost} = vars
     const key = `credential.https://${httpGitHost}.helper`
     const helper = '!heroku git:credentials'
@@ -116,6 +118,8 @@ export default class Git {
 
   /** Removes `heroku git:credentials` from the global config */
   async removeCredentialHelper() {
+    if (process.env.HEROKU_DISABLE_GIT_CONFIG === '1') return
+
     const {httpGitHost} = vars
     await this.exec(['config', '--global', '--unset-all', `credential.https://${httpGitHost}.helper`])
   }
