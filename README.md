@@ -7,6 +7,90 @@
   [![ISC License](https://img.shields.io/github/license/heroku/cli.svg)](https://github.com/heroku/cli/blob/main/LICENSE)
 </div>
 
+Maintaining dentarg's fork
+=========================
+
+Install the released fork with `brew install dentarg/tap/heroku` and update it
+with `brew upgrade dentarg/tap/heroku`.
+
+- `main` contains the fork's maintenance workflows and scripts. Keep it as the
+  default branch; GitHub schedules only run from the default branch.
+- `local-fixes` contains the CLI patch stack on a stable upstream release. Add
+  each local behavior change and its regression tests in one commit.
+- `dentarg-vVERSION-REVISION` tags identify tested source snapshots. GitHub
+  release immutability locks the tag and its `source.json` and `range-diff.txt`
+  assets after publication. Never move or reuse these tags.
+
+**Release fork source** runs daily at 02:23 UTC and can also be dispatched on
+`main`. It finds the latest published stable upstream release, rebases an
+isolated candidate, and compares the patch IDs before and after the rebase.
+Conflicts, empty patches, changed patches, or a base that is not an upstream
+release tag stop publication. Major upgrades require a manual run with an
+explicit `upstream_tag`.
+
+The candidate is transferred between jobs as a Git bundle. Linux and macOS jobs
+install the committed dependency lock, run the unit suite and lint, and check
+Git configuration preservation and update suppression. The regression checks
+live on `main` so they survive changes to the patch stack. The publishing job
+atomically updates `local-fixes` with an explicit force-with-lease and creates
+the source tag, then publishes its immutable GitHub release. Only that job has
+`contents: write`; no personal token, deploy key, or Heroku credentials are
+needed. Repository rules must permit the bot to update `local-fixes` and create
+release tags. Enable GitHub Actions and release immutability for this fork.
+
+The tap polls published immutable source releases daily. Publishing a source
+release does not dispatch another repository's workflow. A source commit already
+published as an immutable release is a no-op. Changes to local patches can be
+released by dispatching the workflow even when the upstream version is unchanged:
+
+```sh
+gh workflow run fork-release.yml --repo dentarg/heroku-cli --ref main
+```
+
+To select a stable release explicitly, including a reviewed major upgrade:
+
+```sh
+gh workflow run fork-release.yml --repo dentarg/heroku-cli --ref main \
+  -f upstream_tag=v11.12.0
+```
+
+When a run stops, review its summary and the `fork-source` artifact. Resolve the
+rebase on `local-fixes`, run the relevant tests, and push with
+`git push --force-with-lease origin local-fixes`, then dispatch again. Review
+patches implemented upstream before retiring them. The built-in `GITHUB_TOKEN`
+cannot be granted workflow-file write permission, so upstream changes to
+`.github/workflows` also require a reviewed manual rebase and push. This keeps
+routine releases free of stored credentials without stripping upstream files.
+
+An interrupted publication may reserve a tag or leave a draft release. Start a
+new workflow run; it allocates a fresh revision and never overwrites the old tag
+or assets. Do not rerun only the publishing job after it has pushed its tag.
+The tag and source branch are updated together, and a concurrent source edit or
+change to `main` prevents publication. Scheduled jobs can be delayed, and GitHub
+can disable schedules after 60 days without repository activity; keep manual
+dispatch available and check failed runs.
+
+The Homebrew launcher sets `HEROKU_SKIP_NEW_VERSION_CHECK=true` to suppress npm
+version checks and `HEROKU_DISABLE_AUTOUPDATE=true` to disable the separate
+self-updater. The fork's existing Homebrew-detection patch is redundant through
+that launcher and can be retired as a reviewed source change. The automation
+preserves the current patch stack until that change is made explicitly.
+
+Validate maintenance changes with:
+
+```sh
+node --test .github/fork/*.test.mjs
+jactionlint .github/workflows/ci.yml .github/workflows/fork-release.yml
+```
+
+The fork's `main` CI tests the maintenance scripts. The source-release workflow
+runs the CLI checks against the candidate source instead of the maintenance
+branch. Upstream release workflows are not used to publish this fork.
+
+When running `npm run test:ci:unit` locally on the source branch, unset
+`NO_COLOR`: the upstream suite currently asserts ANSI color codes in a
+validation error, and disabling color causes that assertion to fail.
+
 Overview
 ========
 

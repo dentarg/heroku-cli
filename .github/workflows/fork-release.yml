@@ -1,0 +1,132 @@
+name: Release fork source
+
+on:
+  schedule:
+    - cron: '23 2 * * *'
+  workflow_dispatch:
+    inputs:
+      upstream_tag:
+        description: Published stable upstream tag (empty for latest; required for a major upgrade)
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fork-source-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: github.repository == 'dentarg/heroku-cli' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      changed: ${{ steps.prepare.outputs.changed }}
+      commit: ${{ steps.prepare.outputs.commit }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          package-manager-cache: false
+      - name: Test release automation
+        run: node --test .github/fork/*.test.mjs
+      - name: Check out patch stack
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: local-fixes
+          path: source
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Prepare and compare rebased candidate
+        id: prepare
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UPSTREAM_TAG: ${{ inputs.upstream_tag }}
+        run: node .github/fork/prepare.mjs source "$RUNNER_TEMP/fork-release"
+      - name: Upload candidate and diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fork-source
+          path: ${{ runner.temp }}/fork-release/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  verify:
+    needs:
+      - prepare
+    if: needs.prepare.outputs.changed == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          package-manager-cache: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: fork-source
+          path: ${{ runner.temp }}/fork-release
+      - name: Restore exact candidate
+        env:
+          CANDIDATE_COMMIT: ${{ needs.prepare.outputs.commit }}
+        run: |
+          git clone --branch fork-candidate "$RUNNER_TEMP/fork-release/source.bundle" source
+          test "$(git -C source rev-parse HEAD)" = "$CANDIDATE_COMMIT"
+      - name: Install locked dependencies
+        working-directory: source
+        env:
+          HUSKY: '0'
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Run unit tests and build
+        working-directory: source
+        run: npm run test:ci:unit
+      - name: Lint candidate
+        working-directory: source
+        run: npm run lint
+      - name: Verify fork behavior
+        run: node .github/fork/verify.mjs source
+
+  publish:
+    needs:
+      - prepare
+      - verify
+    if: needs.prepare.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          package-manager-cache: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: fork-source
+          path: ${{ runner.temp }}/fork-release
+      - name: Publish tested source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TESTED_COMMIT: ${{ needs.prepare.outputs.commit }}
+        run: |
+          gh auth setup-git
+          node .github/fork/publish.mjs "$RUNNER_TEMP/fork-release"

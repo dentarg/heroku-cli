@@ -31,6 +31,7 @@ autodestroy
 autoload
 autoloaded
 autoscale
+autosquash
 autovacuum
 awscli
 badheaders
@@ -74,6 +75,7 @@ datahdr
 datawidth
 dbcolor
 dbname
+dentarg
 devcenter
 dickeyxxx
 direwolf
@@ -143,6 +145,7 @@ inreplace
 iotta
 ipages
 ituples
+jactionlint
 jedec
 keyevent
 keyout
