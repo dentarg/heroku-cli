@@ -72,9 +72,8 @@ dispatch available and check failed runs.
 
 The Homebrew launcher sets `HEROKU_SKIP_NEW_VERSION_CHECK=true` to suppress npm
 version checks and `HEROKU_DISABLE_AUTOUPDATE=true` to disable the separate
-self-updater. The fork's existing Homebrew-detection patch is redundant through
-that launcher and can be retired as a reviewed source change. The automation
-preserves the current patch stack until that change is made explicitly.
+self-updater. Homebrew update behavior lives in the tap's launcher. The Git
+configuration opt-out remains the fork's runtime patch.
 
 Validate maintenance changes with:
 
