@@ -19,7 +19,9 @@ const currentMain = git('.', ['ls-remote', 'origin', 'refs/heads/main']).split(/
 if (currentMain !== process.env.GITHUB_SHA) throw new Error('Automation changed during validation; start a new run')
 
 // One push either advances both refs or neither; a concurrent patch edit fails the lease.
-pushCandidate('.', source)
+// Keep the workflow-capable token scoped to the push. Creating the release with
+// GITHUB_TOKEN avoids triggering upstream release workflows in the source tree.
+pushCandidate('.', source, process.env.FORK_RELEASE_TOKEN)
 run('gh', ['release', 'create', source.tag,
   join(directory, 'source.json'), join(directory, 'range-diff.txt'),
   '--repo', repository, '--verify-tag', '--draft', '--title', source.tag, '--notes-file', join(directory, 'notes.md'),

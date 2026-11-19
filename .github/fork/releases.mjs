@@ -103,14 +103,17 @@ export function rebase(checkout, base, target, report) {
   return {commit, previous_commit: previous, patches: after}
 }
 
-export function pushCandidate(checkout, source) {
+export function pushCandidate(checkout, source, workflowToken = '') {
   git(checkout, ['tag', source.tag, source.commit])
-  git(checkout, ['push', '--atomic', `--force-with-lease=refs/heads/${sourceBranch}:${source.previous_commit}`, 'origin', `${source.commit}:refs/heads/${sourceBranch}`, `refs/tags/${source.tag}`])
+  git(checkout, [
+    'push', '--atomic', `--force-with-lease=refs/heads/${sourceBranch}:${source.previous_commit}`,
+    'origin', `${source.commit}:refs/heads/${sourceBranch}`, `refs/tags/${source.tag}`,
+  ], workflowToken ? {env: {GH_TOKEN: workflowToken}} : {})
 }
 
-export function checkWorkflowChanges(checkout, previous, commit) {
+export function checkWorkflowChanges(checkout, previous, commit, hasWorkflowWriteToken = false) {
   const changed = git(checkout, ['diff', '--name-only', previous, commit, '--', '.github/workflows'])
-  if (changed) {
-    throw new Error(`Upstream changed workflow files:\n${changed}\nGITHUB_TOKEN has no workflow-file write permission. Review and push the rebase to local-fixes manually, then dispatch again.`)
+  if (changed && !hasWorkflowWriteToken) {
+    throw new Error(`Upstream changed workflow files:\n${changed}\nGITHUB_TOKEN has no workflow-file write permission. Configure FORK_RELEASE_TOKEN with Contents and Workflows write permissions, then dispatch again.`)
   }
 }

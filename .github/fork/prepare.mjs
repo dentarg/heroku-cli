@@ -51,7 +51,7 @@ try {
     writeFileSync(join(output, 'range-diff.txt'), `${report}\n`)
     if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `Patch comparison for ${upstreamTag}\n\n\`\`\`text\n${report}\n\`\`\`\n`)
   })
-  checkWorkflowChanges(checkout, previous, candidate.commit)
+  checkWorkflowChanges(checkout, previous, candidate.commit, process.env.FORK_RELEASE_TOKEN_CONFIGURED === 'true')
   const packageJson = JSON.parse(git(checkout, ['show', `${candidate.commit}:package.json`]))
   if (packageJson.name !== 'heroku' || packageJson.version !== version) throw new Error('Candidate package.json does not match the upstream release version')
   const tag = nextTag(version, reserved)

@@ -86,3 +86,32 @@ test('stops before publishing new workflow files with the built-in token', t => 
   assert.throws(() => checkWorkflowChanges(directory, patch, candidate.commit), /workflow-file write permission/)
   assert.doesNotThrow(() => checkWorkflowChanges(directory, candidate.commit, candidate.commit))
 })
+
+test('uses a workflow token only for pushing rebased workflow changes', t => {
+  const {directory, base, patch, commit} = fixture(t)
+  const remote = join(directory, 'remote.git')
+  git(directory, ['init', '--bare', remote])
+  git(directory, ['remote', 'add', 'origin', remote])
+  git(directory, ['push', 'origin', 'local-fixes'])
+  mkdirSync(join(directory, '.github/workflows'), {recursive: true})
+  const upstream = commit('.github/workflows/upstream.yml', 'name: upstream\n', 'Add upstream workflow')
+  git(directory, ['switch', 'local-fixes'])
+  const candidate = rebase(directory, base, upstream, () => {})
+  const source = {...candidate, tag: 'dentarg-v1.0.0-1'}
+
+  assert.throws(() => checkWorkflowChanges(directory, patch, candidate.commit), /workflow-file write permission/)
+  assert.doesNotThrow(() => checkWorkflowChanges(directory, patch, candidate.commit, true))
+
+  const bundle = join(directory, 'source.bundle')
+  const publishing = join(directory, 'publishing')
+  git(directory, ['bundle', 'create', bundle, 'refs/heads/fork-candidate'])
+  git(directory, ['clone', '--branch', 'fork-candidate', bundle, publishing])
+  git(publishing, ['remote', 'set-url', 'origin', remote])
+
+  writeFileSync(join(remote, 'hooks/pre-receive'), '#!/usr/bin/env node\nif (process.env.GH_TOKEN !== "test-workflow-token") process.exit(1)\n', {mode: 0o755})
+  const apiToken = process.env.GH_TOKEN
+  pushCandidate(publishing, source, 'test-workflow-token')
+  assert.equal(git(remote, ['rev-parse', 'refs/heads/local-fixes']), candidate.commit)
+  assert.equal(git(remote, ['rev-parse', `refs/tags/${source.tag}`]), candidate.commit)
+  assert.ok(process.env.GH_TOKEN === apiToken)
+})

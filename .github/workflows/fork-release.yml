@@ -47,6 +47,7 @@ jobs:
         id: prepare
         env:
           GH_TOKEN: ${{ github.token }}
+          FORK_RELEASE_TOKEN_CONFIGURED: ${{ secrets.FORK_RELEASE_TOKEN != '' }}
           UPSTREAM_TAG: ${{ inputs.upstream_tag }}
         run: node .github/fork/prepare.mjs source "$RUNNER_TEMP/fork-release"
       - name: Upload candidate and diagnostics
@@ -126,6 +127,7 @@ jobs:
       - name: Publish tested source
         env:
           GH_TOKEN: ${{ github.token }}
+          FORK_RELEASE_TOKEN: ${{ secrets.FORK_RELEASE_TOKEN }}
           TESTED_COMMIT: ${{ needs.prepare.outputs.commit }}
         run: |
           gh auth setup-git

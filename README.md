@@ -34,9 +34,27 @@ Git configuration preservation and update suppression. The regression checks
 live on `main` so they survive changes to the patch stack. The publishing job
 atomically updates `local-fixes` with an explicit force-with-lease and creates
 the source tag, then publishes its immutable GitHub release. Only that job has
-`contents: write`; no personal token, deploy key, or Heroku credentials are
-needed. Repository rules must permit the bot to update `local-fixes` and create
-release tags. Enable GitHub Actions and release immutability for this fork.
+`contents: write`. Repository rules must permit the publishing identity to update
+`local-fixes` and create release tags. Enable GitHub Actions and release
+immutability for this fork.
+
+To publish upstream workflow-file changes automatically, create a
+[fine-grained personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-fine-grained-personal-access-token)
+with access only to `dentarg/heroku-cli` and repository permissions **Contents:
+Read and write** and **Workflows: Read and write**. Store it as the Actions secret
+`FORK_RELEASE_TOKEN` and renew it before it expires:
+
+```sh
+gh secret set FORK_RELEASE_TOKEN --repo dentarg/heroku-cli
+```
+
+The token authenticates only the atomic Git push in the publishing job. Preparation
+receives only a flag indicating whether the secret is configured; validation jobs
+receive no publishing token. GitHub releases still use the built-in
+`GITHUB_TOKEN` so publication does not trigger upstream release workflows.
+Without the secret, releases use `GITHUB_TOKEN` throughout and stop if upstream
+changes `.github/workflows`, because that token cannot gain workflow-file write
+permission.
 
 The tap polls published immutable source releases daily. Publishing a source
 release does not dispatch another repository's workflow. A source commit already
@@ -57,10 +75,10 @@ gh workflow run fork-release.yml --repo dentarg/heroku-cli --ref main \
 When a run stops, review its summary and the `fork-source` artifact. Resolve the
 rebase on `local-fixes`, run the relevant tests, and push with
 `git push --force-with-lease origin local-fixes`, then dispatch again. Review
-patches implemented upstream before retiring them. The built-in `GITHUB_TOKEN`
-cannot be granted workflow-file write permission, so upstream changes to
-`.github/workflows` also require a reviewed manual rebase and push. This keeps
-routine releases free of stored credentials without stripping upstream files.
+patches implemented upstream before retiring them. A workflow-file permission
+failure requires configuring `FORK_RELEASE_TOKEN` as described above, then
+starting a new run. A configured token must have both required write permissions;
+the workflow cannot grant or verify those permissions during preparation.
 
 An interrupted publication may reserve a tag or leave a draft release. Start a
 new workflow run; it allocates a fresh revision and never overwrites the old tag
